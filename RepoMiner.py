@@ -3,6 +3,7 @@ from pydriller import GitRepository
 import sys
 import re
 import time
+import datetime
 import UrlLoader
 import LanguageDetector
 import IOUtils
@@ -11,8 +12,6 @@ import IOUtils
 def extractBuggyCommits(input_filename,local_repos_directory,output_directory):
 
    urls = UrlLoader.getRepos(input_filename)
-
-   projectMap = {}
 
    for url in urls:
 
@@ -34,7 +33,7 @@ def extractBuggyCommits(input_filename,local_repos_directory,output_directory):
 
       startTime = time.time()
 
-      for commit in RepositoryMining(local_repos_directory + "/" +str(projectName), only_in_branch='master',only_no_merge=True).traverse_commits():
+      for commit in RepositoryMining(local_repos_directory + "/" +str(projectName), only_in_branch='master',only_no_merge=True, since=datetime.datetime(2019,6,1,0,0,0)).traverse_commits():
          commit_msg = commit.msg
          containsBug = 'bug' in commit_msg.casefold()
          containsPatch = 'patch' in commit_msg.casefold()
@@ -101,12 +100,105 @@ def extractBuggyCommits(input_filename,local_repos_directory,output_directory):
 
             bugFixes.append(bugFixInfo)
 
-         projectMap[projectName] = bugFixes
+         tempMap = {projectName: bugFixes}
+
+         IOUtils.writeBugMap(tempMap,output_directory,"_bug_fixing_commits")
+
+      endTime = time.time()
+
+      print("time", endTime - startTime)
 
 
-   IOUtils.writeBugMap(projectMap,output_directory)
 
+def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
 
-   endTime = time.time()
+   bugInducingProjectMap = {}
 
-   print("time", endTime - startTime)
+   for project,commits in projectMap.items():
+
+      print("finding bug causing commits for ",str(local_repos_directory) + "/" + project)
+
+      repo_path = str(local_repos_directory) + "/" + project
+
+      repo = GitRepository(repo_path)
+
+      startTime = time.time()
+
+      bugInducingCommits = []
+
+      hashes = [x["commit_hash"] for x in commits]
+
+      # analyze each bug fix for this project
+      for bugFix in RepositoryMining(repo_path, only_commits=hashes).traverse_commits():
+
+         print("New commit")
+
+         # get the commits that last touched the modified lines of the files
+         commitsLastTouchedFix = repo.get_commits_last_modified_lines(bugFix)
+
+         bugCausingHashes = set([])
+
+         for filename, fileCommit in commitsLastTouchedFix.items():
+
+            # print(fileCommit)
+            # print(fileCommit)
+            for fileHash in fileCommit:
+               bugCausingHashes.add(fileHash)
+
+         hashList = [x for x in bugCausingHashes]
+
+         # get average statistics about each of these commits
+         # number of files modified for the commit
+         # number of lines added for the commit
+         # number of lines removed for the commit
+         # number of methods changed for the commit
+         # author of the commit
+         # the elapsed time for the bug fix
+         # branches
+         for bugCausingCommit in RepositoryMining(repo_path, only_commits=hashList).traverse_commits():
+
+            numModifiedFiles = len(bugCausingCommit.modifications)
+            linesAdded = 0
+            linesRemoved = 0
+            numMethodsChanged = 0
+            sum_nloc = 0
+            numFilesWithComplexity = 0
+            sumComplexity = 0
+
+            if numModifiedFiles <= 0: continue
+
+            for modification in bugCausingCommit.modifications:
+               sourceCodeLanguage = LanguageDetector.detect(modification.filename)
+               if (sourceCodeLanguage == None or modification.nloc == 0): continue
+               sum_nloc = sum_nloc + modification.nloc
+               linesAdded = linesAdded + modification.added
+               linesRemoved = linesRemoved + modification.removed
+               numMethodsChanged = numMethodsChanged + len(modification.changed_methods)
+               if modification.complexity:
+                  numFilesWithComplexity = numFilesWithComplexity + 1
+                  sumComplexity = sumComplexity + modification.complexity
+
+            bugInducingInfo = {
+                  "commit_hash": bugCausingCommit.hash,
+                  "author": bugCausingCommit.author.name,
+                  "total_complexity": sumComplexity,
+                  "average_complexity": sumComplexity/numFilesWithComplexity,
+                  "sum_nloc": sum_nloc,
+                  "num_files": numModifiedFiles,
+                  "lines_added": linesAdded,
+                  "lines_removed": linesRemoved,
+                  "commit_date": bugCausingCommit.author_date,
+                  "branches": bugCausingCommit.branches,
+                  "num_methods_changed": numMethodsChanged,
+                  "time_to_fix": bugFix.author_date - bugCausingCommit.author_date
+               }
+
+            bugInducingCommits.append(bugInducingInfo)
+
+      tempMap = {project: bugInducingCommits}
+
+      IOUtils.writeBugMap(tempMap,output_directory,"_bug_causing_commits")
+
+      endTime = time.time()
+
+      print("time", endTime - startTime)
