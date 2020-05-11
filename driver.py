@@ -18,3 +18,5 @@ IOUtils.readBugMap(projectMap,bug_fixing_commits_dir)
 
 # use SZZ algorithm to find the big causing commits
 RepoMiner.findBugCausingCommits(projectMap,path_to_local_repos,bug_causing_commits_dir)
+
+# projects = IOUtils.getListOfProjects("./bug_fixing_commits_all","_bug_fixing_commits")

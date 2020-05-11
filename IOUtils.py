@@ -1,5 +1,6 @@
 import pickle
 import os
+import re
 
 def writeBugMap(projectMap,outputDir,fileEnding):
    if not os.path.exists(outputDir): os.makedirs(outputDir)
@@ -16,3 +17,9 @@ def readBugMap(projectMap,inputDir):
          temp_map = pickle.load(buggy_commits_file)
          for project,commits in temp_map.items():
             projectMap[project] = commits
+
+def getListOfProjects(inputDir,fileEnding):
+   projects = []
+   for filename in os.listdir(inputDir):
+      projects.append(re.sub(fileEnding, '', filename))
+   return projects

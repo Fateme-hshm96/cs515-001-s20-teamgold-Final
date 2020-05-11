@@ -131,8 +131,6 @@ def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
       # analyze each bug fix for this project
       for bugFix in RepositoryMining(repo_path, only_commits=hashes).traverse_commits():
 
-         print("New commit")
-
          # get the commits that last touched the modified lines of the files
          commitsLastTouchedFix = repo.get_commits_last_modified_lines(bugFix)
 
@@ -140,8 +138,6 @@ def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
 
          for filename, fileCommit in commitsLastTouchedFix.items():
 
-            # print(fileCommit)
-            # print(fileCommit)
             for fileHash in fileCommit:
                bugCausingHashes.add(fileHash)
 
@@ -169,7 +165,7 @@ def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
 
             for modification in bugCausingCommit.modifications:
                sourceCodeLanguage = LanguageDetector.detect(modification.filename)
-               if (sourceCodeLanguage == None or modification.nloc == 0): continue
+               if (sourceCodeLanguage == None or modification.nloc == 0 or modification.nloc is None): continue
                sum_nloc = sum_nloc + modification.nloc
                linesAdded = linesAdded + modification.added
                linesRemoved = linesRemoved + modification.removed
@@ -178,11 +174,14 @@ def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
                   numFilesWithComplexity = numFilesWithComplexity + 1
                   sumComplexity = sumComplexity + modification.complexity
 
+            if (numFilesWithComplexity != 0): 
+               averageComplexityFixedFiles = sumComplexity / numFilesWithComplexity
+
             bugInducingInfo = {
                   "commit_hash": bugCausingCommit.hash,
                   "author": bugCausingCommit.author.name,
                   "total_complexity": sumComplexity,
-                  "average_complexity": sumComplexity/numFilesWithComplexity,
+                  "average_complexity": averageComplexityFixedFiles,
                   "sum_nloc": sum_nloc,
                   "num_files": numModifiedFiles,
                   "lines_added": linesAdded,
@@ -192,6 +191,19 @@ def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
                   "num_methods_changed": numMethodsChanged,
                   "time_to_fix": bugFix.author_date - bugCausingCommit.author_date
                }
+            
+            # print(bugInducingInfo["commit_hash"])
+            # print(bugInducingInfo["author"])
+            # print(bugInducingInfo["total_complexity"])
+            # print(bugInducingInfo["average_complexity"])
+            # print(bugInducingInfo["sum_nloc"])
+            # print(bugInducingInfo["num_files"])
+            # print(bugInducingInfo["lines_added"])
+            # print(bugInducingInfo["lines_removed"])
+            # print(bugInducingInfo["commit_date"])
+            # print(bugInducingInfo["branches"])
+            # print(bugInducingInfo["num_methods_changed"])
+            # print(bugInducingInfo["time_to_fix"])
 
             bugInducingCommits.append(bugInducingInfo)
 
