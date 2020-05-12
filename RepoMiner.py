@@ -1,27 +1,33 @@
 from pydriller import RepositoryMining
 from pydriller import GitRepository
 import sys
+import os
 import re
 import time
 import datetime
-import UrlLoader
+import ProjectLoader
 import LanguageDetector
 import IOUtils
 
 
 def extractBuggyCommits(input_filename,local_repos_directory,output_directory):
 
-   urls = UrlLoader.getRepos(input_filename)
+   projects = ProjectLoader.getReposPlainName(input_filename)
 
-   for url in urls:
+   print(projects)
+
+   for projectName in projects:
 
       bug_counter = 0
       bugFixes = []
 
-      urlTokens = url.split('/')
-      projectName = urlTokens[len(urlTokens)-1]
-
       print("Analyzing",projectName)
+
+      if (projectName == 'pytorch' or projectName == 'react-native'): continue
+
+      if (os.path.exists(str(output_directory) + "/" + str(projectName) + "_bug_fixing_commits") and os.path.isfile(str(output_directory) + "/" + str(projectName) + "_bug_fixing_commits")): 
+         print(projectName,"already analyzed, skipping...")
+         continue
 
       # 1. iterate over each project
       # 2. find all commits that fixed bugs using syntactic analysis
@@ -118,6 +124,10 @@ def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
 
       print("finding bug causing commits for ",str(local_repos_directory) + "/" + project)
 
+      if (os.path.exists(str(output_directory) + "/" + str(project) + "_bug_causing_commits") and os.path.isfile(str(output_directory) + "/" + str(project) + "_bug_causing_commits")): 
+         print(project,"already analyzed, skipping...")
+         continue
+
       repo_path = str(local_repos_directory) + "/" + project
 
       repo = GitRepository(repo_path)
@@ -128,89 +138,100 @@ def findBugCausingCommits(projectMap,local_repos_directory,output_directory):
 
       hashes = [x["commit_hash"] for x in commits]
 
-      # analyze each bug fix for this project
-      for bugFix in RepositoryMining(repo_path, only_commits=hashes).traverse_commits():
+      try:
 
-         # get the commits that last touched the modified lines of the files
-         commitsLastTouchedFix = repo.get_commits_last_modified_lines(bugFix)
+         # analyze each bug fix for this project
+         for bugFix in RepositoryMining(repo_path, only_commits=hashes).traverse_commits():
 
-         bugCausingHashes = set([])
+            # get the commits that last touched the modified lines of the files
+            commitsLastTouchedFix = repo.get_commits_last_modified_lines(bugFix)
 
-         for filename, fileCommit in commitsLastTouchedFix.items():
+            bugCausingHashes = set([])
 
-            for fileHash in fileCommit:
-               bugCausingHashes.add(fileHash)
+            for filename, fileCommit in commitsLastTouchedFix.items():
 
-         hashList = [x for x in bugCausingHashes]
+               for fileHash in fileCommit:
+                  bugCausingHashes.add(fileHash)
 
-         # get average statistics about each of these commits
-         # number of files modified for the commit
-         # number of lines added for the commit
-         # number of lines removed for the commit
-         # number of methods changed for the commit
-         # author of the commit
-         # the elapsed time for the bug fix
-         # branches
-         for bugCausingCommit in RepositoryMining(repo_path, only_commits=hashList).traverse_commits():
+            hashList = [x for x in bugCausingHashes]
 
-            numModifiedFiles = len(bugCausingCommit.modifications)
-            linesAdded = 0
-            linesRemoved = 0
-            numMethodsChanged = 0
-            sum_nloc = 0
-            numFilesWithComplexity = 0
-            sumComplexity = 0
+            # get average statistics about each of these commits
+            # number of files modified for the commit
+            # number of lines added for the commit
+            # number of lines removed for the commit
+            # number of methods changed for the commit
+            # author of the commit
+            # the elapsed time for the bug fix
+            # branches
+            for bugCausingCommit in RepositoryMining(repo_path, only_commits=hashList).traverse_commits():
 
-            if numModifiedFiles <= 0: continue
+               numModifiedFiles = len(bugCausingCommit.modifications)
+               linesAdded = 0
+               linesRemoved = 0
+               numMethodsChanged = 0
+               sum_nloc = 0
+               numFilesWithComplexity = 0
+               sumComplexity = 0
 
-            for modification in bugCausingCommit.modifications:
-               sourceCodeLanguage = LanguageDetector.detect(modification.filename)
-               if (sourceCodeLanguage == None or modification.nloc == 0 or modification.nloc is None): continue
-               sum_nloc = sum_nloc + modification.nloc
-               linesAdded = linesAdded + modification.added
-               linesRemoved = linesRemoved + modification.removed
-               numMethodsChanged = numMethodsChanged + len(modification.changed_methods)
-               if modification.complexity:
-                  numFilesWithComplexity = numFilesWithComplexity + 1
-                  sumComplexity = sumComplexity + modification.complexity
+               if numModifiedFiles <= 0: continue
 
-            if (numFilesWithComplexity != 0): 
-               averageComplexityFixedFiles = sumComplexity / numFilesWithComplexity
+               for modification in bugCausingCommit.modifications:
+                  sourceCodeLanguage = LanguageDetector.detect(modification.filename)
+                  try:
+                     if (sourceCodeLanguage == None or modification.nloc == 0 or modification.nloc is None): continue
+                  except:
+                     pass
+                  sum_nloc = sum_nloc + modification.nloc
+                  linesAdded = linesAdded + modification.added
+                  linesRemoved = linesRemoved + modification.removed
+                  numMethodsChanged = numMethodsChanged + len(modification.changed_methods)
+                  if modification.complexity:
+                     numFilesWithComplexity = numFilesWithComplexity + 1
+                     sumComplexity = sumComplexity + modification.complexity
 
-            bugInducingInfo = {
-                  "commit_hash": bugCausingCommit.hash,
-                  "author": bugCausingCommit.author.name,
-                  "total_complexity": sumComplexity,
-                  "average_complexity": averageComplexityFixedFiles,
-                  "sum_nloc": sum_nloc,
-                  "num_files": numModifiedFiles,
-                  "lines_added": linesAdded,
-                  "lines_removed": linesRemoved,
-                  "commit_date": bugCausingCommit.author_date,
-                  "branches": bugCausingCommit.branches,
-                  "num_methods_changed": numMethodsChanged,
-                  "time_to_fix": bugFix.author_date - bugCausingCommit.author_date
-               }
-            
-            # print(bugInducingInfo["commit_hash"])
-            # print(bugInducingInfo["author"])
-            # print(bugInducingInfo["total_complexity"])
-            # print(bugInducingInfo["average_complexity"])
-            # print(bugInducingInfo["sum_nloc"])
-            # print(bugInducingInfo["num_files"])
-            # print(bugInducingInfo["lines_added"])
-            # print(bugInducingInfo["lines_removed"])
-            # print(bugInducingInfo["commit_date"])
-            # print(bugInducingInfo["branches"])
-            # print(bugInducingInfo["num_methods_changed"])
-            # print(bugInducingInfo["time_to_fix"])
+               averageComplexityFixedFiles = 0
 
-            bugInducingCommits.append(bugInducingInfo)
+               if (numFilesWithComplexity != 0): 
+                  averageComplexityFixedFiles = sumComplexity / numFilesWithComplexity
 
-      tempMap = {project: bugInducingCommits}
+               bugInducingInfo = {
+                     "commit_hash": bugCausingCommit.hash,
+                     "author": bugCausingCommit.author.name,
+                     "total_complexity": sumComplexity,
+                     "average_complexity": averageComplexityFixedFiles,
+                     "sum_nloc": sum_nloc,
+                     "num_files": numModifiedFiles,
+                     "lines_added": linesAdded,
+                     "lines_removed": linesRemoved,
+                     "commit_date": bugCausingCommit.author_date,
+                     "branches": bugCausingCommit.branches,
+                     "num_methods_changed": numMethodsChanged,
+                     "time_to_fix": bugFix.author_date - bugCausingCommit.author_date
+                  }
+               
+               # print(bugInducingInfo["commit_hash"])
+               # print(bugInducingInfo["author"])
+               # print(bugInducingInfo["total_complexity"])
+               # print(bugInducingInfo["average_complexity"])
+               # print(bugInducingInfo["sum_nloc"])
+               # print(bugInducingInfo["num_files"])
+               # print(bugInducingInfo["lines_added"])
+               # print(bugInducingInfo["lines_removed"])
+               # print(bugInducingInfo["commit_date"])
+               # print(bugInducingInfo["branches"])
+               # print(bugInducingInfo["num_methods_changed"])
+               # print(bugInducingInfo["time_to_fix"])
 
-      IOUtils.writeBugMap(tempMap,output_directory,"_bug_causing_commits")
+               bugInducingCommits.append(bugInducingInfo)
 
-      endTime = time.time()
+         tempMap = {project: bugInducingCommits}
 
-      print("time", endTime - startTime)
+         IOUtils.writeBugMap(tempMap,output_directory,"_bug_causing_commits")
+
+         endTime = time.time()
+
+         print("time", endTime - startTime)
+
+      except:
+         print("FAILED FOR",project)
+         pass
