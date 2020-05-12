@@ -153,7 +153,7 @@ avg_lines_added = {}
 avg_lines_removed = {}
 avg_num_methods_changed = {}
 num_author = {}
-for key, val in projectMap.items():
+for key, val in bugFixing.items():
     authors = set()
     times = []
     a = 0
