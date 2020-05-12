@@ -10,7 +10,7 @@ def plot(title, xLabel, yLabel, xVals, yVals, filename):
    fig = plt.gcf()
    fig.set_size_inches(18.5, 11.5)
    font = { 'weight': 'normal',
-         'size'   : 12}
+         'size'   : 20}
    plt.rc('font', **font)
    plt.plot(xVals,yVals)
    plt.savefig(filename, bbox_inches='tight')
@@ -23,6 +23,243 @@ def keywithmaxval(d):
      v=list(d.values())
      k=list(d.keys())
      return k[v.index(max(v))]
+
+
+def analyzeLinesRemoved(bugCausing, bugFixing, notBugs):
+
+   bugCausingList = []
+   bugCausingProjects = []
+   bugFixingList = []
+   bugFixingProjects = []
+   notBugsList = []
+   notBugsProjects = []
+
+   # remove duplicated commits
+   for project,commits in bugCausing.items():
+      uniqueCommits = []
+      for commit in commits:
+         tempHash = commit['commit_hash']
+         if (tempHash in [x['commit_hash'] for x in uniqueCommits]): continue
+         else: uniqueCommits.append(commit)
+      bugCausing[project] = uniqueCommits
+
+
+   for project,commits in bugCausing.items():
+      numLinesRemovedBugCausing = []
+      for commit in commits:
+         numLinesRemovedBugCausing.append(commit["lines_removed"])
+      if len(numLinesRemovedBugCausing) != 0: 
+         bugCausingList.append(sum(numLinesRemovedBugCausing)/len(numLinesRemovedBugCausing))
+         bugCausingProjects.append(project)
+
+
+   for project,commits in bugFixing.items():
+      numLinesRemovedBugFixing = []
+      for commit in commits:
+         numLinesRemovedBugFixing.append(commit["lines_removed"])
+      if len(numLinesRemovedBugFixing) != 0: 
+         bugFixingProjects.append(project)
+         bugFixingList.append(sum(numLinesRemovedBugFixing)/len(numLinesRemovedBugFixing))
+
+   for project,commits in notBugs.items():
+      numLinesRemovedNotBugs = []
+      for commit in commits:
+         numLinesRemovedNotBugs.append(commit["lines_removed"])
+      if len(numLinesRemovedNotBugs) != 0: 
+         notBugsProjects.append(project)
+         notBugsList.append(sum(numLinesRemovedNotBugs)/len(numLinesRemovedNotBugs))
+
+
+   bugCausingProjectsSorted = [x for _,x in sorted(zip(bugCausingList,bugCausingProjects),reverse=True)]
+   bugCausingSorted = sorted(bugCausingList,reverse=True)
+
+   bugFixingProjectsSorted = [x for _,x in sorted(zip(bugFixingList,bugFixingProjects),reverse=True)]
+   bugFixingSorted = sorted(bugFixingList,reverse=True)
+
+   notBugsProjectsSorted = [x for _,x in sorted(zip(notBugsList,notBugsProjects),reverse=True)]
+   notBugsSorted = sorted(notBugsList,reverse=True)
+
+   bugFixingListSorted = sorted(bugFixingList,reverse=True)
+   bugCausingListSorted = sorted(bugCausingList,reverse=True)
+   notBugsListSorted = sorted(notBugsList,reverse=True)
+
+   bugFixAverage = sum(bugFixingList)/len(bugFixingList)
+   bugCausingAverage = sum(bugCausingList)/len(bugCausingList)
+   notBugsAverage = sum(notBugsList)/len(notBugsList)
+
+   print("bug fix average number of lines removed",bugFixAverage)
+   print("bug causing average number of lines removed",bugCausingAverage)
+   print("not bugs average number of lines removed",notBugsAverage)
+
+   plt.hlines(bugFixAverage, 0, len(bugFixingListSorted), colors='k', linestyles='solid')
+   plt.text(1,bugFixAverage+1,'average = ' + str(bugFixAverage))
+   plot("Average number of lines removed per project - bug fixes","github project", "Average number of lines removed per commit",bugFixingProjectsSorted,bugFixingListSorted,"lines-removed-bug-fixing.png")
+
+   plt.hlines(bugCausingAverage, 0, len(bugCausingListSorted), colors='k', linestyles='solid')
+   plt.text(1,bugCausingAverage+1,'average = ' + str(bugCausingAverage))
+   plot("Average number of lines removed per project - bug causers","github project", "Average number of lines removed per commit",bugCausingProjectsSorted,bugCausingListSorted,"lines-removed-bug-causing.png")
+
+   plt.hlines(notBugsAverage, 0, len(notBugsListSorted), colors='k', linestyles='solid')
+   plt.text(1,notBugsAverage+4,'average = ' + str(notBugsAverage))
+   plot("Average number of lines removed per project - not bugs","github project", "Average number of lines removed per commit",notBugsProjectsSorted,notBugsListSorted,"lines-removed-not-bugs.png")
+
+
+def analyzeLinesAdded(bugCausing, bugFixing, notBugs):
+
+   bugCausingList = []
+   bugCausingProjects = []
+   bugFixingList = []
+   bugFixingProjects = []
+   notBugsList = []
+   notBugsProjects = []
+
+   # remove duplicated commits
+   for project,commits in bugCausing.items():
+      uniqueCommits = []
+      for commit in commits:
+         tempHash = commit['commit_hash']
+         if (tempHash in [x['commit_hash'] for x in uniqueCommits]): continue
+         else: uniqueCommits.append(commit)
+      bugCausing[project] = uniqueCommits
+
+
+   for project,commits in bugCausing.items():
+      numLinesAddedBugCausing = []
+      for commit in commits:
+         numLinesAddedBugCausing.append(commit["lines_added"])
+      if len(numLinesAddedBugCausing) != 0: 
+         bugCausingList.append(sum(numLinesAddedBugCausing)/len(numLinesAddedBugCausing))
+         bugCausingProjects.append(project)
+
+
+   for project,commits in bugFixing.items():
+      numLinesAddedBugFixing = []
+      for commit in commits:
+         numLinesAddedBugFixing.append(commit["lines_added"])
+      if len(numLinesAddedBugFixing) != 0: 
+         bugFixingProjects.append(project)
+         bugFixingList.append(sum(numLinesAddedBugFixing)/len(numLinesAddedBugFixing))
+
+   for project,commits in notBugs.items():
+      numLinesAddedNotBugs = []
+      for commit in commits:
+         numLinesAddedNotBugs.append(commit["lines_added"])
+      if len(numLinesAddedNotBugs) != 0: 
+         notBugsProjects.append(project)
+         notBugsList.append(sum(numLinesAddedNotBugs)/len(numLinesAddedNotBugs))
+
+
+   bugCausingProjectsSorted = [x for _,x in sorted(zip(bugCausingList,bugCausingProjects),reverse=True)]
+   bugCausingSorted = sorted(bugCausingList,reverse=True)
+
+   bugFixingProjectsSorted = [x for _,x in sorted(zip(bugFixingList,bugFixingProjects),reverse=True)]
+   bugFixingSorted = sorted(bugFixingList,reverse=True)
+
+   notBugsProjectsSorted = [x for _,x in sorted(zip(notBugsList,notBugsProjects),reverse=True)]
+   notBugsSorted = sorted(notBugsList,reverse=True)
+
+   bugFixingListSorted = sorted(bugFixingList,reverse=True)
+   bugCausingListSorted = sorted(bugCausingList,reverse=True)
+   notBugsListSorted = sorted(notBugsList,reverse=True)
+
+   bugFixAverage = sum(bugFixingList)/len(bugFixingList)
+   bugCausingAverage = sum(bugCausingList)/len(bugCausingList)
+   notBugsAverage = sum(notBugsList)/len(notBugsList)
+
+   print("bug fix average number of lines added",bugFixAverage)
+   print("bug causing average number of lines added",bugCausingAverage)
+   print("not bugs average number of lines added",notBugsAverage)
+
+   plt.hlines(bugFixAverage, 0, len(bugFixingListSorted), colors='k', linestyles='solid')
+   plt.text(1,bugFixAverage+1,'average = ' + str(bugFixAverage))
+   plot("Average number of lines added per project - bug fixes","github project", "Average number of lines added per commit",bugFixingProjectsSorted,bugFixingListSorted,"lines-added-bug-fixing.png")
+
+   plt.hlines(bugCausingAverage, 0, len(bugCausingListSorted), colors='k', linestyles='solid')
+   plt.text(1,bugCausingAverage+1,'average = ' + str(bugCausingAverage))
+   plot("Average number of lines added per project - bug causers","github project", "Average number of lines added per commit",bugCausingProjectsSorted,bugCausingListSorted,"lines-added-bug-causing.png")
+
+   plt.hlines(notBugsAverage, 0, len(notBugsListSorted), colors='k', linestyles='solid')
+   plt.text(1,notBugsAverage+4,'average = ' + str(notBugsAverage))
+   plot("Average number of lines added per project - not bugs","github project", "Average number of lines added per commit",notBugsProjectsSorted,notBugsListSorted,"lines-added-not-bugs.png")
+
+
+def analyzeNumFiles(bugCausing, bugFixing, notBugs):
+
+   bugCausingList = []
+   bugCausingProjects = []
+   bugFixingList = []
+   bugFixingProjects = []
+   notBugsList = []
+   notBugsProjects = []
+
+   # remove duplicated commits
+   for project,commits in bugCausing.items():
+      uniqueCommits = []
+      for commit in commits:
+         tempHash = commit['commit_hash']
+         if (tempHash in [x['commit_hash'] for x in uniqueCommits]): continue
+         else: uniqueCommits.append(commit)
+      bugCausing[project] = uniqueCommits
+
+
+   for project,commits in bugCausing.items():
+      numFilesModifiedBugCausing = []
+      for commit in commits:
+         numFilesModifiedBugCausing.append(commit["num_files"])
+      if len(numFilesModifiedBugCausing) != 0: 
+         bugCausingList.append(sum(numFilesModifiedBugCausing)/len(numFilesModifiedBugCausing))
+         bugCausingProjects.append(project)
+
+
+   for project,commits in bugFixing.items():
+      numFilesModifiedBugFixing = []
+      for commit in commits:
+         numFilesModifiedBugFixing.append(commit["num_files"])
+      if len(numFilesModifiedBugFixing) != 0: 
+         bugFixingProjects.append(project)
+         bugFixingList.append(sum(numFilesModifiedBugFixing)/len(numFilesModifiedBugFixing))
+
+   for project,commits in notBugs.items():
+      numFilesModifiedNotBugs = []
+      for commit in commits:
+         numFilesModifiedNotBugs.append(commit["num_files"])
+      if len(numFilesModifiedNotBugs) != 0: 
+         notBugsProjects.append(project)
+         notBugsList.append(sum(numFilesModifiedNotBugs)/len(numFilesModifiedNotBugs))
+
+
+   bugCausingProjectsSorted = [x for _,x in sorted(zip(bugCausingList,bugCausingProjects),reverse=True)]
+   bugCausingSorted = sorted(bugCausingList,reverse=True)
+
+   bugFixingProjectsSorted = [x for _,x in sorted(zip(bugFixingList,bugFixingProjects),reverse=True)]
+   bugFixingSorted = sorted(bugFixingList,reverse=True)
+
+   notBugsProjectsSorted = [x for _,x in sorted(zip(notBugsList,notBugsProjects),reverse=True)]
+   notBugsSorted = sorted(notBugsList,reverse=True)
+
+   bugFixingListSorted = sorted(bugFixingList,reverse=True)
+   bugCausingListSorted = sorted(bugCausingList,reverse=True)
+   notBugsListSorted = sorted(notBugsList,reverse=True)
+
+   bugFixAverage = sum(bugFixingList)/len(bugFixingList)
+   bugCausingAverage = sum(bugCausingList)/len(bugCausingList)
+   notBugsAverage = sum(notBugsList)/len(notBugsList)
+
+   print("bug fix average number of files modified",bugFixAverage)
+   print("bug causing average number of files modified",bugCausingAverage)
+   print("not bugs average number of files modified",notBugsAverage)
+
+   plt.hlines(bugFixAverage, 0, len(bugFixingListSorted), colors='k', linestyles='solid')
+   plt.text(1,bugFixAverage+1,'average = ' + str(bugFixAverage))
+   plot("Average number of files changed per project - bug fixes","github project", "Average number of files changed per commit",bugFixingProjectsSorted,bugFixingListSorted,"files-changed-bug-fixing.png")
+
+   plt.hlines(bugCausingAverage, 0, len(bugCausingListSorted), colors='k', linestyles='solid')
+   plt.text(1,bugCausingAverage+1,'average = ' + str(bugCausingAverage))
+   plot("Average number of files changed per project - bug causers","github project", "Average number of files changed per commit",bugCausingProjectsSorted,bugCausingListSorted,"files-changed-bug-causing.png")
+
+   plt.hlines(notBugsAverage, 0, len(notBugsListSorted), colors='k', linestyles='solid')
+   plt.text(1,notBugsAverage+4,'average = ' + str(notBugsAverage))
+   plot("Average number of files changed per project - not bugs","github project", "Average number of files changed per commit",notBugsProjectsSorted,notBugsListSorted,"files-changed-not-bugs.png")
 
 
 def analyzeComplexity(bugCausing, bugFixing, notBugs):
