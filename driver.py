@@ -137,13 +137,15 @@ for project, commits in bugCausing.items():
     numMethodsModifiedBugCausing = []
     for commit in commits:
         numMethodsModifiedBugCausing.append(commit["num_methods_changed"])
-    bugCausingList.append(sum(numMethodsModifiedBugCausing) / len(numMethodsModifiedBugCausing))
+    if len(numMethodsModifiedBugCausing) > 0:
+        bugCausingList.append(sum(numMethodsModifiedBugCausing) / len(numMethodsModifiedBugCausing))
 
 for project, commits in bugFixing.items():
     numMethodsModifiedBugFixing = []
     for commit in commits:
         numMethodsModifiedBugFixing.append(commit["num_methods_changed"])
-    bugFixingList.append(sum(numMethodsModifiedBugFixing) / len(numMethodsModifiedBugFixing))
+    if len(numMethodsModifiedBugFixing) > 0:
+        bugFixingList.append(sum(numMethodsModifiedBugFixing) / len(numMethodsModifiedBugFixing))
 
 print(bugCausingList)
 print(bugFixingList)
